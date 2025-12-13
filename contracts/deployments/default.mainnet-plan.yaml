@@ -11,8 +11,8 @@ plan:
         - contract-publish:
             contract-name: bittask
             expected-sender: SP34HE2KF7SPKB8BD5GY39SG7M207FZPRXJS4NMY9
-            cost: 26030
+            cost: 35560
             path: contracts/bittask.clar
             anchor-block-only: true
-            clarity-version: 2
-      epoch: "2.5"
+            clarity-version: 3
+      epoch: "3.0"

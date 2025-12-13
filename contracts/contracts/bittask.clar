@@ -8,6 +8,8 @@
 (define-constant ERR-PAST-DEADLINE (err u103))
 (define-constant ERR-EMPTY-TITLE (err u104))
 (define-constant ERR-EMPTY-DESCRIPTION (err u105))
+(define-constant ERR-NOT-OPEN (err u106))
+(define-constant ERR-CREATOR-CANNOT-ACCEPT (err u107))
 
 ;; Data Vars
 (define-data-var task-nonce uint u0)
@@ -81,6 +83,37 @@
         })
 
         (ok task-id)
+    )
+)
+
+;; @desc Accept a task
+;; @param id uint - Task ID
+(define-public (accept-task (id uint))
+    (let ((task (unwrap! (map-get? Tasks id) ERR-INVALID-ID)))
+        ;; Check that sender is not the creator
+        (asserts! (not (is-eq tx-sender (get creator task)))
+            ERR-CREATOR-CANNOT-ACCEPT
+        )
+
+        ;; Check that status is open
+        (asserts! (is-eq (get status task) "open") ERR-NOT-OPEN)
+
+        ;; Update task
+        (map-set Tasks id
+            (merge task {
+                worker: (some tx-sender),
+                status: "in-progress",
+            })
+        )
+
+        ;; Emit event
+        (print {
+            event: "accepted",
+            id: id,
+            worker: tx-sender,
+        })
+
+        (ok true)
     )
 )
 

@@ -159,4 +159,121 @@ describe('bittask contract', () => {
             Cl.none()
         ]);
     });
+
+    it('ensure that a worker can accept a task', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+        const user2 = accounts.get("wallet_2")!;
+
+        // Create Task
+        const createResult = simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task to Accept"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+        // Capture the ID (expected to be 1 since state resets)
+        // Note: For robustness we could parse it, but assuming 1 is fine given observations. 
+        // Let's assume 1 for now as per logs.
+
+        // Capture block height at creation time
+        const createdBlockHeight = simnet.blockHeight;
+
+        // Accept Task
+        const result = simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user2
+        );
+        expect(result.result).toBeOk(Cl.bool(true));
+
+        // Verify Task Status
+        const task = simnet.callReadOnlyFn(
+            'bittask',
+            'get-task',
+            [Cl.uint(1)],
+            deployer
+        );
+
+        expect(task.result).toBeSome(Cl.tuple({
+            title: Cl.stringAscii("Task to Accept"),
+            description: Cl.stringAscii("Description"),
+            creator: Cl.principal(wallet1),
+            worker: Cl.some(Cl.principal(user2)),
+            amount: Cl.uint(amount),
+            deadline: Cl.uint(deadline),
+            status: Cl.stringAscii("in-progress"),
+            'created-at': Cl.uint(createdBlockHeight)
+        }));
+    });
+
+    it('ensure that creator cannot accept their own task', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+
+        // Create Task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Self Accept Task"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Try to Accept Task as Creator
+        const result = simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            wallet1
+        );
+        expect(result.result).toBeErr(Cl.uint(107)); // ERR-CREATOR-CANNOT-ACCEPT
+    });
+
+    it('ensure that task cannot be accepted if not open', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+        const user2 = accounts.get("wallet_2")!;
+        const user3 = accounts.get("wallet_3")!;
+
+        // Create Task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Double Accept Task"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Accept Task (User 2)
+        simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user2
+        );
+
+        // Try to Accept Task Again (User 3)
+        const result = simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user3
+        );
+        expect(result.result).toBeErr(Cl.uint(106)); // ERR-NOT-OPEN
+    });
 });
