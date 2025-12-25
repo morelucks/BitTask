@@ -16,7 +16,7 @@ async function registerChainhook() {
     const chainhook: ChainhookDefinition = {
         name: 'BitTask Events',
         chain: 'stacks',
-        network: getChainhooksNetwork() as 'mainnet' | 'testnet' | 'devnet', // Type assertion if needed
+        network: getChainhooksNetwork() as 'mainnet' | 'testnet',
         version: 1,
         networks: {
             [getChainhooksNetwork()]: {
