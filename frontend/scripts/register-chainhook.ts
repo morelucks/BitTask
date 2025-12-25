@@ -17,7 +17,7 @@ async function registerChainhook() {
         name: 'BitTask Events',
         chain: 'stacks',
         network: getChainhooksNetwork() as 'mainnet' | 'testnet',
-        version: 1,
+        version: '1',
         networks: {
             [getChainhooksNetwork()]: {
                 if_this: {
