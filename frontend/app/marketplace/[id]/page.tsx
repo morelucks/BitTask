@@ -3,27 +3,26 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Task, fetchTasks } from '../../../lib/contracts';
-import { ArrowLeft, Loader2, Clock, User, DollarSign, CheckCircle, AlertCircle, Upload } from 'lucide-react';
+import { ArrowLeft, Loader2, Clock, User, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
-import { useAuth } from '../../../components/Providers';
-import { acceptTask, submitWork, approveWork } from '../../../lib/contractActions';
-import { showNotification } from '../../../lib/notifications';
 
 export default function TaskDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const { isConnected, walletInfo } = useAuth();
-    const taskId = parseInt(params.id as string);
+    // Safely parse ID, defaulting to NaN if invalid
+    const taskId = params?.id ? parseInt(Array.isArray(params.id) ? params.id[0] : params.id) : NaN;
 
     const [task, setTask] = useState<Task | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isActionLoading, setIsActionLoading] = useState(false);
-    const [proofFile, setProofFile] = useState<File | null>(null);
-
-    const userAddress = walletInfo?.addresses?.[2]?.address || walletInfo?.addresses?.[0]?.address;
 
     useEffect(() => {
+        if (isNaN(taskId)) {
+            setError('Invalid Task ID');
+            setIsLoading(false);
+            return;
+        }
+
         async function loadTask() {
             try {
                 const tasks = await fetchTasks();
@@ -44,75 +43,16 @@ export default function TaskDetailPage() {
         loadTask();
     }, [taskId]);
 
-    const handleAcceptTask = async () => {
-        if (!isConnected) {
-            showNotification.error('Please connect your wallet first');
-            return;
-        }
-
-        setIsActionLoading(true);
+    const safeDate = (timestamp: number) => {
+        if (!timestamp || isNaN(timestamp)) return 'No Deadline';
         try {
-            await acceptTask(taskId);
-            showNotification.success('Task accepted!', 'You can now start working on it');
-            // Refresh task data
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
-        } catch (error) {
-            console.error('Error accepting task:', error);
-            showNotification.error('Failed to accept task', 'Please try again');
-        } finally {
-            setIsActionLoading(false);
-        }
-    };
-
-    const handleSubmitWork = async () => {
-        if (!isConnected) {
-            showNotification.error('Please connect your wallet first');
-            return;
-        }
-
-        if (!proofFile) {
-            showNotification.error('Please upload proof of work');
-            return;
-        }
-
-        setIsActionLoading(true);
-        try {
-            // TODO: Upload file to IPFS and get hash
-            // For now, use a placeholder hash
-            const placeholderHash = 'a'.repeat(64);
-            await submitWork(taskId, placeholderHash);
-            showNotification.success('Work submitted!', 'Waiting for creator approval');
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
-        } catch (error) {
-            console.error('Error submitting work:', error);
-            showNotification.error('Failed to submit work', 'Please try again');
-        } finally {
-            setIsActionLoading(false);
-        }
-    };
-
-    const handleApproveWork = async () => {
-        if (!isConnected) {
-            showNotification.error('Please connect your wallet first');
-            return;
-        }
-
-        setIsActionLoading(true);
-        try {
-            await approveWork(taskId);
-            showNotification.success('Work approved!', 'Payment released to worker');
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
-        } catch (error) {
-            console.error('Error approving work:', error);
-            showNotification.error('Failed to approve work', 'Please try again');
-        } finally {
-            setIsActionLoading(false);
+            return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+            });
+        } catch (e) {
+            return 'Invalid Date';
         }
     };
 
@@ -142,8 +82,6 @@ export default function TaskDetailPage() {
     }
 
     const isExpired = Date.now() > task.deadline * 1000;
-    const isCreator = userAddress === task.creator;
-    const isWorker = userAddress === task.worker;
     const statusColor = {
         'open': 'bg-green-500/10 text-green-400',
         'in-progress': 'bg-yellow-500/10 text-yellow-400',
@@ -196,11 +134,7 @@ export default function TaskDetailPage() {
                             <div>
                                 <p className="text-gray-500 text-sm">Deadline</p>
                                 <p className={`text-lg font-semibold ${isExpired ? 'text-red-400' : 'text-white'}`}>
-                                    {new Date(task.deadline * 1000).toLocaleDateString('en-US', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric',
-                                    })}
+                                    {safeDate(task.deadline)}
                                 </p>
                                 {isExpired && <p className="text-red-400 text-sm mt-1">Expired</p>}
                             </div>
@@ -214,7 +148,6 @@ export default function TaskDetailPage() {
                             <div>
                                 <p className="text-gray-500 text-sm">Creator</p>
                                 <p className="text-sm font-mono text-gray-300 break-all">{task.creator}</p>
-                                {isCreator && <span className="text-xs text-cyan-400 mt-1 block">You</span>}
                             </div>
                         </div>
 
@@ -227,7 +160,6 @@ export default function TaskDetailPage() {
                                 <div>
                                     <p className="text-gray-500 text-sm">Assigned Worker</p>
                                     <p className="text-sm font-mono text-gray-300 break-all">{task.worker}</p>
-                                    {isWorker && <span className="text-xs text-purple-400 mt-1 block">You</span>}
                                 </div>
                             </div>
                         )}
@@ -238,65 +170,24 @@ export default function TaskDetailPage() {
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-4">
                     <h2 className="text-xl font-bold mb-4">Actions</h2>
 
-                    {!isConnected && (
-                        <div className="text-center py-6 bg-gray-800 rounded-lg">
-                            <AlertCircle className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
-                            <p className="text-gray-300">Connect your wallet to interact with tasks</p>
-                        </div>
-                    )}
-
-                    {isConnected && task.status === 'open' && !isExpired && !task.worker && (
-                        <button
-                            onClick={handleAcceptTask}
-                            disabled={isActionLoading || isCreator}
-                            className="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-                        >
-                            {isActionLoading && <Loader2 className="h-5 w-5 animate-spin" />}
-                            {isCreator ? 'You created this task' : isActionLoading ? 'Accepting...' : 'Accept Task'}
+                    {task.status === 'open' && !isExpired && (
+                        <button className="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-semibold transition-colors">
+                            Accept Task
                         </button>
                     )}
 
-                    {isConnected && task.status === 'in-progress' && isWorker && (
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-300">
-                                    Upload Proof of Work
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="file"
-                                        onChange={(e) => setProofFile(e.target.files?.[0] || null)}
-                                        className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
-                                    />
-                                    {proofFile && <span className="text-green-400 text-sm">✓ {proofFile.name}</span>}
-                                </div>
-                            </div>
-                            <button
-                                onClick={handleSubmitWork}
-                                disabled={isActionLoading || !proofFile}
-                                className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-                            >
-                                {isActionLoading && <Loader2 className="h-5 w-5 animate-spin" />}
-                                <Upload className="h-5 w-5" />
-                                {isActionLoading ? 'Submitting...' : 'Submit Work'}
-                            </button>
-                        </div>
+                    {task.status === 'in-progress' && task.worker && (
+                        <button className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors">
+                            Submit Work
+                        </button>
                     )}
 
-                    {isConnected && task.status === 'submitted' && isCreator && (
+                    {task.status === 'submitted' && (
                         <div className="space-y-3">
-                            <button
-                                onClick={handleApproveWork}
-                                disabled={isActionLoading}
-                                className="w-full py-3 px-6 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-                            >
-                                {isActionLoading && <Loader2 className="h-5 w-5 animate-spin" />}
-                                {isActionLoading ? 'Approving...' : 'Approve Work'}
+                            <button className="w-full py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors">
+                                Approve Work
                             </button>
-                            <button
-                                disabled={isActionLoading}
-                                className="w-full py-3 px-6 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors"
-                            >
+                            <button className="w-full py-3 px-6 bg-red-600 hover:bg-red-700 rounded-lg font-semibold transition-colors">
                                 Reject Work
                             </button>
                         </div>

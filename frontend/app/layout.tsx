@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BitTask - Decentralized Microgigs Marketplace",
-  description: "Post tasks, get work done, and earn crypto instantly on Stacks",
+  title: "BitTask",
+  description: "BitTask - The Decentralized Task Marketplace",
 };
 
 import { Providers } from "@/components/Providers";
