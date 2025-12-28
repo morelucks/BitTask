@@ -68,3 +68,11 @@
         (ok true)
     )
 )
+(define-public (mint (amount uint) (recipient principal))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        (try! (ft-mint? amount recipient))
+        (print {action: "mint", recipient: recipient, amount: amount})
+        (ok true)
+    )
+)
