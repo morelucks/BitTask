@@ -592,4 +592,61 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(noSupply.result).toBeOk(Cl.bool(false));
     });
   });
+
+  describe("Batch Query Functions", () => {
+    beforeEach(() => {
+      // Mint multiple tokens
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(50)],
+        deployer
+      );
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(bob), Cl.uint(1), Cl.uint(25)],
+        deployer
+      );
+    });
+
+    it("should get batch balances correctly", () => {
+      const result = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance-batch",
+        [
+          Cl.list([Cl.principal(alice), Cl.principal(bob)]),
+          Cl.list([Cl.uint(1), Cl.uint(1)])
+        ],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.list([Cl.uint(100), Cl.uint(25)]));
+    });
+
+    it("should get batch supplies correctly", () => {
+      const result = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-total-supply-batch",
+        [Cl.list([Cl.uint(1), Cl.uint(2)])],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.list([Cl.uint(125), Cl.uint(50)]));
+    });
+
+    it("should check batch token existence", () => {
+      const result = simnet.callReadOnlyFn(
+        "erc1155",
+        "token-exists-batch",
+        [Cl.list([Cl.uint(1), Cl.uint(2), Cl.uint(999)])],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.list([Cl.bool(true), Cl.bool(true), Cl.bool(false)]));
+    });
+  });
 });
