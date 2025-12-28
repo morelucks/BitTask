@@ -116,3 +116,18 @@ describe('BitToken Contract', () => {
     
     expect(transferFrom.result).toBeErr(Cl.uint(2)); // ERR-INSUFFICIENT-ALLOWANCE
   });
+  it('should mint tokens as contract owner', () => {
+    const mintAmount = 10000;
+    
+    const mint = simnet.callPublicFn(
+      'token', 
+      'mint', 
+      [Cl.uint(mintAmount), Cl.principal(alice)], 
+      deployer
+    );
+    
+    expect(mint.result).toBeOk(Cl.bool(true));
+    
+    const aliceBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(alice)], deployer);
+    expect(aliceBalance.result).toBeOk(Cl.uint(mintAmount));
+  });
