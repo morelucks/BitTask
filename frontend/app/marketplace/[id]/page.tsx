@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Task, fetchTasks } from '../../../lib/contracts';
-import { acceptTask, submitWork, approveWork, rejectWork } from '../../../lib/contractActions';
+import { acceptTask, submitWork, approveWork, rejectWork, reclaimExpired } from '../../../lib/contractActions';
 import { useAuth } from '../../../components/Providers';
 import { useStacksWallet } from '../../../lib/stacks-wallet';
 import { useTransactionTracker } from '../../../lib/transactionTracker';
+import { isTaskExpired, getCurrentBlockHeight } from '../../../lib/taskUtils';
 import { showNotification } from '../../../lib/notifications';
 import { ArrowLeft, Loader2, Clock, User, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -26,6 +27,8 @@ export default function TaskDetailPage() {
     const [isActionLoading, setIsActionLoading] = useState(false);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
     const [submissionText, setSubmissionText] = useState('');
+    const [isExpired, setIsExpired] = useState(false);
+    const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
 
     useEffect(() => {
         if (isNaN(taskId)) {
@@ -52,7 +55,14 @@ export default function TaskDetailPage() {
         }
 
         loadTask();
+        getCurrentBlockHeight().then(setCurrentBlockHeight);
     }, [taskId]);
+
+    useEffect(() => {
+        if (task) {
+            isTaskExpired(task).then(setIsExpired);
+        }
+    }, [task, currentBlockHeight]);
 
     const reloadTask = async () => {
         try {

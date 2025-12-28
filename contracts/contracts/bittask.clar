@@ -230,6 +230,42 @@
     )
 )
 
+;; @desc Reclaim funds from an expired task
+;; @param id uint - Task ID
+(define-public (reclaim-expired (id uint))
+    (let ((task (unwrap! (map-get? Tasks id) ERR-INVALID-ID)))
+        ;; Check that sender is the creator
+        (asserts! (is-eq tx-sender (get creator task)) ERR-NOT-CREATOR)
+
+        ;; Check that task is open (not assigned or expired before assignment)
+        (asserts! (is-eq (get status task) "open") ERR-NOT-OPEN)
+
+        ;; Check that deadline has passed
+        (asserts! (<= (get deadline task) stacks-block-height) ERR-PAST-DEADLINE)
+
+        ;; Update task status to completed (prevents further actions)
+        (map-set Tasks id
+            (merge task {
+                status: "completed",
+            })
+        )
+
+        ;; Refund STX from contract back to creator
+        (try! (as-contract (stx-transfer? (get amount task) tx-sender (get creator task))))
+
+        ;; Emit event
+        (print {
+            event: "reclaimed",
+            id: id,
+            creator: tx-sender,
+            amount: (get amount task),
+            reason: "expired",
+        })
+
+        (ok true)
+    )
+)
+
 ;; Read-only functions
 
 (define-read-only (get-task (id uint))
