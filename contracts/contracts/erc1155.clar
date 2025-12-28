@@ -114,3 +114,92 @@
 (define-read-only (is-approved-for-all (owner principal) (operator principal))
     (default-to false (map-get? operator-approvals {owner: owner, operator: operator}))
 )
+
+;; Operator Approval System
+
+;; @desc Set or unset approval for an operator to manage all tokens
+;; @param operator: The principal to approve or revoke
+;; @param approved: True to approve, false to revoke
+;; @returns: Success response
+(define-public (set-approval-for-all (operator principal) (approved bool))
+    (begin
+        ;; Cannot approve yourself
+        (asserts! (not (is-eq tx-sender operator)) ERR-INVALID-PRINCIPAL)
+        
+        ;; Set or remove approval
+        (if approved
+            (map-set operator-approvals {owner: tx-sender, operator: operator} true)
+            (map-delete operator-approvals {owner: tx-sender, operator: operator})
+        )
+        
+        ;; Emit approval event
+        (print {
+            event: "approval-for-all",
+            owner: tx-sender,
+            operator: operator,
+            approved: approved
+        })
+        
+        (ok true)
+    )
+)
+
+;; Helper function to check if a principal is authorized to transfer tokens
+;; @param owner: The token owner
+;; @param operator: The potential operator
+;; @returns: True if authorized (owner or approved operator)
+(define-private (is-authorized (owner principal) (operator principal))
+    (or 
+        (is-eq owner operator)
+        (is-approved-for-all owner operator)
+    )
+)
+
+;; Operator Approval System
+
+;; @desc Set or unset approval for an operator to manage all caller's tokens
+;; @param operator: The principal to approve or revoke
+;; @param approved: True to approve, false to revoke
+;; @returns: Success response
+(define-public (set-approval-for-all (operator principal) (approved bool))
+    (begin
+        ;; Cannot approve yourself as operator
+        (asserts! (not (is-eq tx-sender operator)) ERR-INVALID-PRINCIPAL)
+        
+        ;; Set or remove approval
+        (if approved
+            (map-set operator-approvals {owner: tx-sender, operator: operator} true)
+            (map-delete operator-approvals {owner: tx-sender, operator: operator})
+        )
+        
+        ;; Emit approval event
+        (print {
+            event: "approval-for-all",
+            owner: tx-sender,
+            operator: operator,
+            approved: approved
+        })
+        
+        (ok true)
+    )
+)
+
+;; Helper Functions for Transfer Authorization
+
+;; @desc Check if a principal is authorized to transfer tokens on behalf of owner
+;; @param owner: The token owner
+;; @param operator: The potential operator
+;; @returns: True if authorized (owner or approved operator)
+(define-private (is-authorized (owner principal) (operator principal))
+    (or 
+        (is-eq owner operator)  ;; Owner can always transfer their own tokens
+        (is-approved-for-all owner operator)  ;; Approved operator can transfer
+    )
+)
+
+;; @desc Validate that the caller is authorized to transfer tokens
+;; @param owner: The token owner
+;; @returns: Error if not authorized, ok if authorized
+(define-private (assert-authorized (owner principal))
+    (asserts! (is-authorized owner tx-sender) ERR-UNAUTHORIZED)
+)
