@@ -71,3 +71,31 @@ describe('BitToken Contract', () => {
     
     expect(allowance.result).toBeOk(Cl.uint(approveAmount));
   });
+  it('should transfer-from with valid allowance', () => {
+    const approveAmount = 5000;
+    const transferAmount = 2000;
+    
+    // First approve
+    simnet.callPublicFn('token', 'approve', [Cl.principal(alice), Cl.uint(approveAmount)], deployer);
+    
+    // Then transfer-from
+    const transferFrom = simnet.callPublicFn(
+      'token', 
+      'transfer-from', 
+      [Cl.uint(transferAmount), Cl.principal(deployer), Cl.principal(bob), Cl.none()], 
+      alice
+    );
+    
+    expect(transferFrom.result).toBeOk(Cl.bool(true));
+    
+    const bobBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(bob)], deployer);
+    expect(bobBalance.result).toBeOk(Cl.uint(transferAmount));
+    
+    const remainingAllowance = simnet.callReadOnlyFn(
+      'token', 
+      'get-allowance', 
+      [Cl.principal(deployer), Cl.principal(alice)], 
+      deployer
+    );
+    expect(remainingAllowance.result).toBeOk(Cl.uint(approveAmount - transferAmount));
+  });
