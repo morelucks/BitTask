@@ -67,3 +67,5 @@ export const metadata = {
     url: 'https://bittask.app',
     icons: ['https://avatars.githubusercontent.com/u/179229932']
 }
+// Updated networks
+// Updated adapter
