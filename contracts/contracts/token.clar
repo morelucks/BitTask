@@ -42,3 +42,10 @@
 (define-public (get-decimals)
     (ok TOKEN-DECIMALS)
 )
+(define-public (get-balance (account principal))
+    (ok (default-to u0 (map-get? balances account)))
+)
+
+(define-public (get-total-supply)
+    (ok TOTAL-SUPPLY)
+)
