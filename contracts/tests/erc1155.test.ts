@@ -37,7 +37,7 @@ describe("ERC1155 Multi-Token Contract", () => {
     it("should not be paused initially", () => {
       const result = simnet.callReadOnlyFn(
         "erc1155",
-        "is-paused",
+        "is-contract-paused",
         [],
         deployer
       );
@@ -329,7 +329,7 @@ describe("ERC1155 Multi-Token Contract", () => {
       const result = simnet.callPublicFn(
         "erc1155",
         "burn-tokens",
-        [Cl.principal(alice), Cl.uint(1), Cl.uint(30)],
+        [Cl.uint(1), Cl.uint(30)],
         alice
       );
       expect(result.result).toBeOk(Cl.bool(true));
@@ -347,20 +347,110 @@ describe("ERC1155 Multi-Token Contract", () => {
       const result = simnet.callPublicFn(
         "erc1155",
         "burn-tokens",
-        [Cl.principal(alice), Cl.uint(1), Cl.uint(200)],
+        [Cl.uint(1), Cl.uint(200)],
         alice
       );
       expect(result.result).toBeErr(Cl.uint(100)); // ERR-INSUFFICIENT-BALANCE
     });
 
-    it("should reject unauthorized burning", () => {
+    it("should reject burning zero amount", () => {
       const result = simnet.callPublicFn(
         "erc1155",
         "burn-tokens",
-        [Cl.principal(alice), Cl.uint(1), Cl.uint(30)],
-        bob
+        [Cl.uint(1), Cl.uint(0)],
+        alice
+      );
+      expect(result.result).toBeErr(Cl.uint(103)); // ERR-ZERO-AMOUNT
+    });
+  });
+
+  describe("Metadata Management", () => {
+    it("should allow owner to set token URI", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "set-token-uri",
+        [Cl.uint(1), Cl.stringAscii("https://example.com/token/1")],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const uri = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-token-uri",
+        [Cl.uint(1)],
+        deployer
+      );
+      expect(uri.result).toBeOk(Cl.stringAscii("https://example.com/token/1"));
+    });
+
+    it("should reject URI setting by non-owner", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "set-token-uri",
+        [Cl.uint(1), Cl.stringAscii("https://example.com/token/1")],
+        alice
       );
       expect(result.result).toBeErr(Cl.uint(101)); // ERR-UNAUTHORIZED
+    });
+  });
+
+  describe("Contract Management", () => {
+    it("should allow owner to pause contract", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "pause-contract",
+        [],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const isPaused = simnet.callReadOnlyFn(
+        "erc1155",
+        "is-contract-paused",
+        [],
+        deployer
+      );
+      expect(isPaused.result).toBeOk(Cl.bool(true));
+    });
+
+    it("should allow owner to unpause contract", () => {
+      // First pause
+      simnet.callPublicFn("erc1155", "pause-contract", [], deployer);
+      
+      // Then unpause
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "unpause-contract",
+        [],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const isPaused = simnet.callReadOnlyFn(
+        "erc1155",
+        "is-contract-paused",
+        [],
+        deployer
+      );
+      expect(isPaused.result).toBeOk(Cl.bool(false));
+    });
+
+    it("should get contract summary", () => {
+      const result = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-contract-summary",
+        [],
+        deployer
+      );
+      expect(result.result).toBeOk(
+        Cl.tuple({
+          owner: Cl.principal(deployer),
+          "next-token-id": Cl.uint(1),
+          "total-token-types": Cl.uint(0),
+          paused: Cl.bool(false),
+          "block-height": Cl.uint(1)
+        })
+      );
     });
   });
 });
