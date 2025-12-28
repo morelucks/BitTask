@@ -277,6 +277,31 @@
     )
 )
 
+;; Metadata Management Functions
+
+;; @desc Set metadata URI for a token type (owner only)
+;; @param token-id: The token ID to set metadata for
+;; @param uri: The metadata URI string
+;; @returns: Success response
+(define-public (set-token-uri (token-id uint) (uri (string-ascii 256)))
+    (begin
+        ;; Only contract owner can set metadata
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        
+        ;; Set the URI (works for both existing and future tokens)
+        (map-set token-uris token-id uri)
+        
+        ;; Emit metadata update event
+        (print {
+            event: "uri-updated",
+            token-id: token-id,
+            uri: uri
+        })
+        
+        (ok true)
+    )
+)
+
 ;; Operator Approval System
 
 ;; @desc Set or unset approval for an operator to manage all caller's tokens
@@ -431,8 +456,8 @@
         ;; Authorization check
         (try! (assert-authorized from))
         
-        ;; Process all transfers atomically
-        (try! (fold process-batch-transfer (zip-batch token-ids amounts) (ok true)))
+        ;; Execute all transfers atomically
+        (try! (execute-batch-transfers from to token-ids amounts))
         
         ;; Emit batch transfer event
         (print {
@@ -448,29 +473,60 @@
     )
 )
 
-;; Helper function to process individual transfers in batch
-(define-private (process-batch-transfer 
-    (transfer-data {token-id: uint, amount: uint}) 
-    (previous-result (response bool uint)))
-    (let ((token-id (get token-id transfer-data))
-          (amount (get amount transfer-data)))
-        ;; Only proceed if previous transfers succeeded
-        (match previous-result
-            success (begin
-                ;; Validate amount is positive
-                (asserts! (> amount u0) ERR-ZERO-AMOUNT)
+;; @desc Execute batch transfers atomically
+;; @param from: Sender address
+;; @param to: Recipient address  
+;; @param token-ids: List of token IDs
+;; @param amounts: List of amounts
+;; @returns: Success response
+(define-private (execute-batch-transfers (from principal) (to principal) (token-ids (list 100 uint)) (amounts (list 100 uint)))
+    (fold execute-single-batch-transfer 
+          (zip-batch token-ids amounts) 
+          {from: from, to: to, success: true}))
+
+;; Helper to execute individual transfer in batch
+(define-private (execute-single-batch-transfer 
+    (transfer-data {token-id: uint, amount: uint})
+    (state {from: principal, to: principal, success: bool}))
+    (if (get success state)
+        (let ((token-id (get token-id transfer-data))
+              (amount (get amount transfer-data))
+              (from (get from state))
+              (to (get to state)))
+            ;; Validate amount is positive
+            (asserts! (> amount u0) (merge state {success: false}))
+            
+            ;; Get current balance and validate
+            (let ((current-balance (get-balance from token-id)))
+                (asserts! (>= current-balance amount) (merge state {success: false}))
                 
-                ;; Get current balance
-                (let ((current-balance (get-balance tx-sender token-id)))
-                    ;; Check sufficient balance
-                    (asserts! (>= current-balance amount) ERR-INSUFFICIENT-BALANCE)
+                ;; Update balances
+                (let ((new-from-balance (- current-balance amount))
+                      (current-to-balance (get-balance to token-id))
+                      (new-to-balance (+ current-to-balance amount)))
                     
-                    ;; This is a validation pass - actual transfers happen in execute-batch-transfer
-                    (ok true)
+                    ;; Set new balances
+                    (if (> new-from-balance u0)
+                        (map-set token-balances {owner: from, token-id: token-id} new-from-balance)
+                        (map-delete token-balances {owner: from, token-id: token-id})
+                    )
+                    (map-set token-balances {owner: to, token-id: token-id} new-to-balance)
+                    
+                    ;; Emit individual transfer event
+                    (print {
+                        event: "transfer-single",
+                        operator: tx-sender,
+                        from: from,
+                        to: to,
+                        token-id: token-id,
+                        amount: amount
+                    })
+                    
+                    state ;; Return unchanged state on success
                 )
             )
-            error error ;; Propagate error
         )
+        state ;; Return failed state
     )
 )
 
@@ -482,28 +538,4 @@
 ;; Helper function to create transfer pairs
 (define-private (make-transfer-pair (token-id uint) (amount uint))
     {token-id: token-id, amount: amount}
-)
-
-;; @desc Execute batch transfers after validation
-;; @param from: Sender address
-;; @param to: Recipient address  
-;; @param token-ids: List of token IDs
-;; @param amounts: List of amounts
-;; @returns: Success response
-(define-private (execute-batch-transfers (from principal) (to principal) (token-ids (list 100 uint)) (amounts (list 100 uint)))
-    (fold execute-single-batch-transfer (zip-batch token-ids amounts) (ok true))
-)
-
-;; Helper to execute individual transfer in batch
-(define-private (execute-single-batch-transfer 
-    (transfer-data {token-id: uint, amount: uint})
-    (previous-result (response bool uint)))
-    (match previous-result
-        success (let ((token-id (get token-id transfer-data))
-                      (amount (get amount transfer-data)))
-            ;; Execute the actual transfer
-            (transfer-internal (some tx-sender) (some (unwrap-panic (some tx-sender))) token-id amount)
-        )
-        error error
-    )
 )
