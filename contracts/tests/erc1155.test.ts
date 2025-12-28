@@ -649,4 +649,52 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(result.result).toBeOk(Cl.list([Cl.bool(true), Cl.bool(true), Cl.bool(false)]));
     });
   });
+
+  describe("Owner Management", () => {
+    it("should transfer ownership successfully", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "transfer-ownership",
+        [Cl.principal(alice)],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const newOwner = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-contract-owner",
+        [],
+        deployer
+      );
+      expect(newOwner.result).toBeOk(Cl.principal(alice));
+    });
+
+    it("should reject ownership transfer by non-owner", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "transfer-ownership",
+        [Cl.principal(alice)],
+        bob
+      );
+      expect(result.result).toBeErr(Cl.uint(101)); // ERR-UNAUTHORIZED
+    });
+
+    it("should renounce ownership", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "renounce-ownership",
+        [],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const owner = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-contract-owner",
+        [],
+        deployer
+      );
+      expect(owner.result).toBeOk(Cl.principal('SP000000000000000000002Q6VF78'));
+    });
+  });
 });
