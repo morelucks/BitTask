@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Task, fetchTasks } from '../../../lib/contracts';
 import { acceptTask, submitWork, approveWork } from '../../../lib/contractActions';
 import { useAuth } from '../../../components/Providers';
+import { useStacksWallet } from '../../../lib/stacks-wallet';
 import { showNotification } from '../../../lib/notifications';
 import { ArrowLeft, Loader2, Clock, User, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -16,6 +17,7 @@ export default function TaskDetailPage() {
     const taskId = params?.id ? parseInt(Array.isArray(params.id) ? params.id[0] : params.id) : NaN;
 
     const { isConnected, address } = useAuth();
+    const { userSession } = useStacksWallet();
     const [task, setTask] = useState<Task | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export default function TaskDetailPage() {
 
         setIsActionLoading(true);
         try {
-            await acceptTask(taskId, {
+            await acceptTask(userSession, taskId, {
                 onFinish: async (data) => {
                     showNotification.success('Task accepted!', 'You are now assigned to this task');
                     await reloadTask();
@@ -95,7 +97,7 @@ export default function TaskDetailPage() {
 
         setIsActionLoading(true);
         try {
-            await submitWork(taskId, submissionText.trim(), {
+            await submitWork(userSession, taskId, submissionText.trim(), {
                 onFinish: async (data) => {
                     showNotification.success('Work submitted!', 'Waiting for creator approval');
                     setShowSubmitModal(false);
@@ -117,7 +119,7 @@ export default function TaskDetailPage() {
     const handleApproveWork = async () => {
         setIsActionLoading(true);
         try {
-            await approveWork(taskId, {
+            await approveWork(userSession, taskId, {
                 onFinish: async (data) => {
                     showNotification.success('Work approved!', 'Payment has been released to the worker');
                     await reloadTask();
