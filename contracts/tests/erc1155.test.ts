@@ -93,4 +93,52 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(result.result).toBeErr(Cl.uint(103)); // ERR-ZERO-AMOUNT
     });
   });
+
+  describe("Balance Queries", () => {
+    beforeEach(() => {
+      // Mint some tokens for testing
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(50)],
+        deployer
+      );
+    });
+
+    it("should return correct balance for existing tokens", () => {
+      const balance = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(1)],
+        deployer
+      );
+      expect(balance.result).toBeOk(Cl.uint(100));
+    });
+
+    it("should return zero for non-existent tokens", () => {
+      const balance = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(999)],
+        deployer
+      );
+      expect(balance.result).toBeOk(Cl.uint(0));
+    });
+
+    it("should return zero for non-existent principals", () => {
+      const balance = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(charlie), Cl.uint(1)],
+        deployer
+      );
+      expect(balance.result).toBeOk(Cl.uint(0));
+    });
+  });
 });
