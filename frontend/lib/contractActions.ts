@@ -1,6 +1,7 @@
 import { openContractCall } from '@stacks/connect';
+import { UserSession } from '@stacks/auth';
 import { STACKS_MAINNET, STACKS_TESTNET } from '@stacks/network';
-import { uintCV, stringAsciiCV, createAssetInfo, createSTXPostCondition, FungibleConditionCode } from '@stacks/transactions';
+import { uintCV, stringAsciiCV, createSTXPostCondition, FungibleConditionCode } from '@stacks/transactions';
 
 const CONTRACT_ADDRESS = 'SP34HE2KF7SPKB8BD5GY39SG7M207FZPRXJS4NMY9';
 const CONTRACT_NAME = 'bittask';
@@ -14,6 +15,7 @@ export interface ContractCallOptions {
 }
 
 export async function createTask(
+  userSession: UserSession,
   title: string,
   description: string,
   amount: number, // in micro-STX (1 STX = 1,000,000 micro-STX)
@@ -45,6 +47,7 @@ export async function createTask(
       ],
       network,
       postConditions,
+      userSession,
       onFinish: (data) => {
         console.log('Task created:', data);
         options?.onFinish?.(data);
@@ -61,6 +64,7 @@ export async function createTask(
 }
 
 export async function acceptTask(
+  userSession: UserSession,
   taskId: number,
   options?: ContractCallOptions
 ): Promise<void> {
@@ -71,6 +75,7 @@ export async function acceptTask(
       functionName: 'accept-task',
       functionArgs: [uintCV(taskId)],
       network,
+      userSession,
       onFinish: (data) => {
         console.log('Task accepted:', data);
         options?.onFinish?.(data);
@@ -87,6 +92,7 @@ export async function acceptTask(
 }
 
 export async function submitWork(
+  userSession: UserSession,
   taskId: number,
   submission: string, // Link or hash of the work (string-ascii 256)
   options?: ContractCallOptions
@@ -101,6 +107,7 @@ export async function submitWork(
         stringAsciiCV(submission),
       ],
       network,
+      userSession,
       onFinish: (data) => {
         console.log('Work submitted:', data);
         options?.onFinish?.(data);
@@ -117,6 +124,7 @@ export async function submitWork(
 }
 
 export async function approveWork(
+  userSession: UserSession,
   taskId: number,
   options?: ContractCallOptions
 ): Promise<void> {
@@ -127,6 +135,7 @@ export async function approveWork(
       functionName: 'approve-work',
       functionArgs: [uintCV(taskId)],
       network,
+      userSession,
       onFinish: (data) => {
         console.log('Work approved:', data);
         options?.onFinish?.(data);

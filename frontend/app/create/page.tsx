@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../components/Providers';
+import { useStacksWallet } from '../../lib/stacks-wallet';
 import { showNotification } from '../../lib/notifications';
 import { createTask } from '../../lib/contractActions';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -11,6 +12,7 @@ import Link from 'next/link';
 export default function CreateTaskPage() {
     const router = useRouter();
     const { isConnected } = useAuth();
+    const { userSession } = useStacksWallet();
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
@@ -107,6 +109,7 @@ export default function CreateTaskPage() {
 
             // Call create-task contract function
             await createTask(
+                userSession,
                 formData.title.trim(),
                 formData.description.trim(),
                 amount, // Will be converted to micro-STX in contractActions
