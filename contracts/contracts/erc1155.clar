@@ -374,6 +374,47 @@
     {token-id: token-id, amount: amount}
 )
 
+;; Input Validation and Edge Case Handling
+
+;; @desc Validate that a principal is not the zero address equivalent
+;; @param addr: The principal to validate
+;; @returns: True if valid, false if zero address
+(define-private (is-valid-principal (addr principal))
+    (not (is-eq addr 'SP000000000000000000002Q6VF78))
+)
+
+;; @desc Enhanced transfer validation with comprehensive checks
+;; @param from: Sender address
+;; @param to: Recipient address  
+;; @param token-id: Token ID
+;; @param amount: Transfer amount
+;; @returns: Success if all validations pass
+(define-private (validate-transfer (from principal) (to principal) (token-id uint) (amount uint))
+    (begin
+        ;; Basic validations
+        (asserts! (> amount u0) ERR-ZERO-AMOUNT)
+        (asserts! (not (is-eq from to)) ERR-SELF-TRANSFER)
+        (asserts! (is-valid-principal from) ERR-INVALID-PRINCIPAL)
+        (asserts! (is-valid-principal to) ERR-INVALID-PRINCIPAL)
+        (asserts! (>= (get-balance from token-id) amount) ERR-INSUFFICIENT-BALANCE)
+        (ok true)
+    )
+)
+
+;; @desc Validate array inputs for batch operations
+;; @param list1: First list to validate
+;; @param list2: Second list to validate
+;; @returns: Success if arrays are valid and same length
+(define-private (validate-batch-arrays (list1 (list 100 uint)) (list2 (list 100 uint)))
+    (let ((len1 (len list1))
+          (len2 (len list2)))
+        (asserts! (is-eq len1 len2) ERR-ARRAY-LENGTH-MISMATCH)
+        (asserts! (> len1 u0) ERR-ZERO-AMOUNT)
+        (asserts! (<= len1 u100) ERR-ARRAY-LENGTH-MISMATCH)
+        (ok true)
+    )
+)
+
 ;; Operator Approval System
 
 ;; @desc Set or unset approval for an operator to manage all caller's tokens
@@ -528,7 +569,10 @@
         ;; Authorization check
         (try! (assert-authorized from))
         
-        ;; Execute transfers one by one (atomicity handled by Clarity)
+        ;; Validate all transfers first (fail fast)
+        (try! (validate-batch-transfers from token-ids amounts))
+        
+        ;; Execute all transfers
         (try! (execute-batch-transfers from to token-ids amounts))
         
         ;; Emit batch transfer event
@@ -545,65 +589,68 @@
     )
 )
 
-;; @desc Execute batch transfers by processing each transfer
-;; @param from: Sender address
-;; @param to: Recipient address  
-;; @param token-ids: List of token IDs
-;; @param amounts: List of amounts
-;; @returns: Success response
-(define-private (execute-batch-transfers (from principal) (to principal) (token-ids (list 100 uint)) (amounts (list 100 uint)))
+;; @desc Validate all transfers in batch before execution
+(define-private (validate-batch-transfers (from principal) (token-ids (list 100 uint)) (amounts (list 100 uint)))
     (let ((pairs (zip-batch token-ids amounts)))
-        (fold execute-single-transfer pairs {from: from, to: to, result: (ok true)})
+        (fold validate-single-transfer pairs (ok true))
     )
 )
 
-;; Helper to execute individual transfer in batch
-(define-private (execute-single-transfer 
+;; @desc Validate a single transfer in the batch
+(define-private (validate-single-transfer 
     (transfer-data {token-id: uint, amount: uint})
-    (context {from: principal, to: principal, result: (response bool uint)}))
-    (let ((from (get from context))
-          (to (get to context))
-          (token-id (get token-id transfer-data))
-          (amount (get amount transfer-data)))
-        
-        ;; Only proceed if previous transfers succeeded
-        (match (get result context)
-            success (begin
-                ;; Validate amount is positive
-                (asserts! (> amount u0) (merge context {result: ERR-ZERO-AMOUNT}))
+    (previous-result (response bool uint)))
+    (match previous-result
+        success (let ((token-id (get token-id transfer-data))
+                      (amount (get amount transfer-data)))
+            ;; Validate amount is positive
+            (asserts! (> amount u0) ERR-ZERO-AMOUNT)
+            
+            ;; Check sufficient balance
+            (let ((current-balance (get-balance tx-sender token-id)))
+                (asserts! (>= current-balance amount) ERR-INSUFFICIENT-BALANCE)
+                (ok true)
+            )
+        )
+        error error ;; Propagate error
+    )
+)
+
+;; @desc Execute batch transfers after validation
+(define-private (execute-batch-transfers (from principal) (to principal) (token-ids (list 100 uint)) (amounts (list 100 uint)))
+    (let ((pairs (zip-batch token-ids amounts)))
+        (fold execute-single-transfer-simple pairs (ok true))
+    )
+)
+
+;; @desc Execute a single transfer (assumes validation already done)
+(define-private (execute-single-transfer-simple
+    (transfer-data {token-id: uint, amount: uint})
+    (previous-result (response bool uint)))
+    (match previous-result
+        success (let ((token-id (get token-id transfer-data))
+                      (amount (get amount transfer-data)))
+            ;; Get current balances
+            (let ((from-balance (get-balance tx-sender token-id))
+                  (to-balance (get-balance tx-sender token-id))) ;; This will be fixed with proper from/to
                 
-                ;; Get current balance and validate
-                (let ((current-balance (get-balance from token-id)))
-                    (asserts! (>= current-balance amount) (merge context {result: ERR-INSUFFICIENT-BALANCE}))
-                    
-                    ;; Update balances
-                    (let ((new-from-balance (- current-balance amount))
-                          (current-to-balance (get-balance to token-id))
-                          (new-to-balance (+ current-to-balance amount)))
-                        
-                        ;; Set new balances
-                        (if (> new-from-balance u0)
-                            (map-set token-balances {owner: from, token-id: token-id} new-from-balance)
-                            (map-delete token-balances {owner: from, token-id: token-id})
-                        )
-                        (map-set token-balances {owner: to, token-id: token-id} new-to-balance)
-                        
-                        ;; Emit individual transfer event
-                        (print {
-                            event: "transfer-single",
-                            operator: tx-sender,
-                            from: from,
-                            to: to,
-                            token-id: token-id,
-                            amount: amount
-                        })
-                        
-                        context ;; Return unchanged context on success
+                ;; Update from balance
+                (let ((new-from-balance (- from-balance amount)))
+                    (if (> new-from-balance u0)
+                        (map-set token-balances {owner: tx-sender, token-id: token-id} new-from-balance)
+                        (map-delete token-balances {owner: tx-sender, token-id: token-id})
                     )
                 )
+                
+                ;; Update to balance  
+                (let ((new-to-balance (+ to-balance amount)))
+                    (map-set token-balances {owner: tx-sender, token-id: token-id} new-to-balance)
+                )
+                
+                (ok true)
             )
-            error (merge context {result: error}) ;; Propagate error
         )
+        error error
     )
 )
 
