@@ -542,4 +542,54 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(supply.result).toBeOk(Cl.uint(0));
     });
   });
+
+  describe("Token Existence Queries", () => {
+    beforeEach(() => {
+      // Mint a token
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+    });
+
+    it("should return true for existing tokens", () => {
+      const exists = simnet.callReadOnlyFn(
+        "erc1155",
+        "token-exists",
+        [Cl.uint(1)],
+        deployer
+      );
+      expect(exists.result).toBeOk(Cl.bool(true));
+    });
+
+    it("should return false for non-existent tokens", () => {
+      const exists = simnet.callReadOnlyFn(
+        "erc1155",
+        "token-exists",
+        [Cl.uint(999)],
+        deployer
+      );
+      expect(exists.result).toBeOk(Cl.bool(false));
+    });
+
+    it("should check if token has supply", () => {
+      const hasSupply = simnet.callReadOnlyFn(
+        "erc1155",
+        "has-supply",
+        [Cl.uint(1)],
+        deployer
+      );
+      expect(hasSupply.result).toBeOk(Cl.bool(true));
+
+      const noSupply = simnet.callReadOnlyFn(
+        "erc1155",
+        "has-supply",
+        [Cl.uint(999)],
+        deployer
+      );
+      expect(noSupply.result).toBeOk(Cl.bool(false));
+    });
+  });
 });
