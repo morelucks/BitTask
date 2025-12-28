@@ -123,6 +123,9 @@
 ;; @returns: Success response
 (define-public (set-approval-for-all (operator principal) (approved bool))
     (begin
+        ;; Check if contract is paused
+        (asserts! (not (var-get contract-paused)) ERR-UNAUTHORIZED)
+        
         ;; Cannot approve yourself
         (asserts! (not (is-eq tx-sender operator)) ERR-INVALID-PRINCIPAL)
         
@@ -165,6 +168,9 @@
 ;; @returns: Success response
 (define-public (transfer-single (from principal) (to principal) (token-id uint) (amount uint))
     (let ((sender-balance (get-balance from token-id)))
+        ;; Check if contract is paused
+        (asserts! (not (var-get contract-paused)) ERR-UNAUTHORIZED)
+        
         ;; Input validation
         (asserts! (> amount u0) ERR-ZERO-AMOUNT)
         (asserts! (not (is-eq from to)) ERR-SELF-TRANSFER)
@@ -313,6 +319,9 @@
 (define-public (transfer-batch (from principal) (to principal) (token-ids (list 100 uint)) (amounts (list 100 uint)))
     (let ((token-ids-length (len token-ids))
           (amounts-length (len amounts)))
+        ;; Check if contract is paused
+        (asserts! (not (var-get contract-paused)) ERR-UNAUTHORIZED)
+        
         ;; Input validation
         (asserts! (is-eq token-ids-length amounts-length) ERR-ARRAY-LENGTH-MISMATCH)
         (asserts! (> token-ids-length u0) ERR-ZERO-AMOUNT)
@@ -795,4 +804,162 @@
 ;; Helper function to create transfer pairs
 (define-private (make-transfer-pair (token-id uint) (amount uint))
     {token-id: token-id, amount: amount}
+)
+;; Token Minting Functionality
+
+;; @desc Mint new tokens to a recipient (owner only)
+;; @param to: The recipient address
+;; @param token-id: The token ID to mint (use 0 for new token type)
+;; @param amount: The amount to mint
+;; @returns: The token ID that was minted to
+(define-public (mint-tokens (to principal) (token-id uint) (amount uint))
+    (begin
+        ;; Only contract owner can mint
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        
+        ;; Validate amount is positive
+        (asserts! (> amount u0) ERR-ZERO-AMOUNT)
+        
+        ;; Determine the actual token ID to use
+        (let ((actual-token-id (if (is-eq token-id u0)
+                                   (var-get next-token-id)  ;; Create new token type
+                                   token-id)))              ;; Use existing token type
+            
+            ;; If creating new token type, increment counter and mark as existing
+            (if (is-eq token-id u0)
+                (begin
+                    (var-set next-token-id (+ actual-token-id u1))
+                    (map-set token-exists-map actual-token-id true)
+                )
+                ;; For existing token, verify it exists or create it
+                (if (not (token-exists actual-token-id))
+                    (map-set token-exists-map actual-token-id true)
+                    true
+                )
+            )
+            
+            ;; Update recipient balance
+            (let ((current-balance (get-balance to actual-token-id))
+                  (new-balance (+ current-balance amount)))
+                (map-set token-balances {owner: to, token-id: actual-token-id} new-balance)
+            )
+            
+            ;; Update total supply
+            (let ((current-supply (get-total-supply actual-token-id))
+                  (new-supply (+ current-supply amount)))
+                (map-set token-supplies actual-token-id new-supply)
+            )
+            
+            ;; Emit mint event (transfer from zero address)
+            (print {
+                event: "transfer-single",
+                operator: tx-sender,
+                from: none,
+                to: (some to),
+                token-id: actual-token-id,
+                amount: amount
+            })
+            
+            ;; Emit mint-specific event
+            (print {
+                event: "mint",
+                to: to,
+                token-id: actual-token-id,
+                amount: amount,
+                new-supply: new-supply
+            })
+            
+            (ok actual-token-id)
+        )
+    )
+)
+
+;; @desc Mint multiple token types to a recipient in batch (owner only)
+;; @param to: The recipient address
+;; @param token-ids: List of token IDs to mint
+;; @param amounts: List of amounts to mint (must match token-ids length)
+;; @returns: Success response
+(define-public (mint-batch (to principal) (token-ids (list 100 uint)) (amounts (list 100 uint)))
+    (begin
+        ;; Only contract owner can mint
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        
+        ;; Validate array lengths match
+        (asserts! (is-eq (len token-ids) (len amounts)) ERR-ARRAY-LENGTH-MISMATCH)
+        
+        ;; Execute batch minting
+        (try! (execute-batch-minting to token-ids amounts))
+        
+        ;; Emit batch mint event
+        (print {
+            event: "mint-batch",
+            to: to,
+            token-ids: token-ids,
+            amounts: amounts
+        })
+        
+        (ok true)
+    )
+)
+
+;; @desc Execute batch minting operations
+(define-private (execute-batch-minting (to principal) (token-ids (list 100 uint)) (amounts (list 100 uint)))
+    (let ((pairs (zip-batch token-ids amounts)))
+        (fold execute-single-mint pairs {to: to, result: (ok true)})
+    )
+)
+
+;; @desc Execute a single mint operation in batch
+(define-private (execute-single-mint
+    (mint-data {token-id: uint, amount: uint})
+    (context {to: principal, result: (response bool uint)}))
+    (match (get result context)
+        success (let ((to (get to context))
+                      (token-id (get token-id mint-data))
+                      (amount (get amount mint-data)))
+            ;; Validate amount
+            (asserts! (> amount u0) (merge context {result: ERR-ZERO-AMOUNT}))
+            
+            ;; Determine actual token ID
+            (let ((actual-token-id (if (is-eq token-id u0)
+                                       (var-get next-token-id)
+                                       token-id)))
+                
+                ;; Handle token creation/existence
+                (if (is-eq token-id u0)
+                    (begin
+                        (var-set next-token-id (+ actual-token-id u1))
+                        (map-set token-exists-map actual-token-id true)
+                    )
+                    (if (not (token-exists actual-token-id))
+                        (map-set token-exists-map actual-token-id true)
+                        true
+                    )
+                )
+                
+                ;; Update balances and supply
+                (let ((current-balance (get-balance to actual-token-id))
+                      (new-balance (+ current-balance amount))
+                      (current-supply (get-total-supply actual-token-id))
+                      (new-supply (+ current-supply amount)))
+                    
+                    (map-set token-balances {owner: to, token-id: actual-token-id} new-balance)
+                    (map-set token-supplies actual-token-id new-supply)
+                    
+                    ;; Emit individual mint event
+                    (print {
+                        event: "transfer-single",
+                        operator: tx-sender,
+                        from: none,
+                        to: (some to),
+                        token-id: actual-token-id,
+                        amount: amount
+                    })
+                    
+                    context ;; Return unchanged context
+                )
+            )
+        )
+        error (merge context {result: error})
+    )
 )
