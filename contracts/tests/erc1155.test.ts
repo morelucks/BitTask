@@ -453,4 +453,44 @@ describe("ERC1155 Multi-Token Contract", () => {
       );
     });
   });
+
+  describe("Metadata Management", () => {
+    it("should allow owner to set token URI", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "set-token-uri",
+        [Cl.uint(1), Cl.stringAscii("https://example.com/token/1")],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const uri = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-token-uri",
+        [Cl.uint(1)],
+        deployer
+      );
+      expect(uri.result).toBeOk(Cl.stringAscii("https://example.com/token/1"));
+    });
+
+    it("should reject URI setting by non-owner", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "set-token-uri",
+        [Cl.uint(1), Cl.stringAscii("https://example.com/token/1")],
+        alice
+      );
+      expect(result.result).toBeErr(Cl.uint(101)); // ERR-UNAUTHORIZED
+    });
+
+    it("should return empty string for non-existent token URI", () => {
+      const uri = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-token-uri",
+        [Cl.uint(999)],
+        deployer
+      );
+      expect(uri.result).toBeOk(Cl.stringAscii(""));
+    });
+  });
 });
