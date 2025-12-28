@@ -12,6 +12,8 @@
 (define-constant ERR-NOT-OPEN (err u107))
 (define-constant ERR-NOT-IN-PROGRESS (err u108))
 (define-constant ERR-NOT-WORKER (err u109))
+(define-constant ERR-NOT-SUBMITTED (err u110))
+(define-constant ERR-NOT-CREATOR (err u111))
 
 ;; Data Vars
 (define-data-var task-nonce uint u0)
@@ -152,6 +154,42 @@
         })
 
         (ok true)
+    )
+)
+
+;; @desc Approve work and release payment to worker
+;; @param id uint - Task ID
+(define-public (approve-work (id uint))
+    (let ((task (unwrap! (map-get? Tasks id) ERR-INVALID-ID)))
+        ;; Check that sender is the creator
+        (asserts! (is-eq tx-sender (get creator task)) ERR-NOT-CREATOR)
+
+        ;; Check that status is submitted
+        (asserts! (is-eq (get status task) "submitted") ERR-NOT-SUBMITTED)
+
+        ;; Get worker principal
+        (let ((worker-principal (unwrap! (get worker task) ERR-NOT-WORKER)))
+            ;; Transfer STX from contract to worker
+            (try! (as-contract (stx-transfer? (get amount task) tx-sender worker-principal)))
+
+            ;; Update task status
+            (map-set Tasks id
+                (merge task {
+                    status: "completed",
+                })
+            )
+
+            ;; Emit event
+            (print {
+                event: "approved",
+                id: id,
+                creator: tx-sender,
+                worker: worker-principal,
+                amount: (get amount task),
+            })
+
+            (ok true)
+        )
     )
 )
 
