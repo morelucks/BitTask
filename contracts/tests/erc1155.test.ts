@@ -795,4 +795,116 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(result.result).toBeErr(Cl.uint(103)); // ERR-ZERO-AMOUNT
     });
   });
+
+  describe("Contract Information", () => {
+    beforeEach(() => {
+      // Mint some tokens to change state
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(50)],
+        deployer
+      );
+    });
+
+    it("should return correct contract info", () => {
+      const info = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-contract-info",
+        [],
+        deployer
+      );
+      
+      expect(info.result).toBeOk(
+        Cl.tuple({
+          owner: Cl.principal(deployer),
+          "next-token-id": Cl.uint(3),
+          "total-token-types": Cl.uint(2)
+        })
+      );
+    });
+
+    it("should track next token ID correctly", () => {
+      const nextId = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-next-token-id",
+        [],
+        deployer
+      );
+      expect(nextId.result).toBeOk(Cl.uint(3));
+    });
+  });
+
+  describe("Edge Cases and Error Handling", () => {
+    it("should handle large token amounts", () => {
+      const largeAmount = 1000000000; // 1 billion
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(largeAmount)],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.uint(1));
+
+      const balance = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(1)],
+        deployer
+      );
+      expect(balance.result).toBeOk(Cl.uint(largeAmount));
+    });
+
+    it("should handle multiple token types for same user", () => {
+      // Mint different token types
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(200)],
+        deployer
+      );
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(300)],
+        deployer
+      );
+
+      // Check all balances
+      const balance1 = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(1)],
+        deployer
+      );
+      const balance2 = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(2)],
+        deployer
+      );
+      const balance3 = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(3)],
+        deployer
+      );
+
+      expect(balance1.result).toBeOk(Cl.uint(100));
+      expect(balance2.result).toBeOk(Cl.uint(200));
+      expect(balance3.result).toBeOk(Cl.uint(300));
+    });
+  });
 });
