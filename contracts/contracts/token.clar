@@ -31,3 +31,14 @@
         (ok true)
     )
 )
+(define-public (get-name)
+    (ok TOKEN-NAME)
+)
+
+(define-public (get-symbol)
+    (ok TOKEN-SYMBOL)
+)
+
+(define-public (get-decimals)
+    (ok TOKEN-DECIMALS)
+)
