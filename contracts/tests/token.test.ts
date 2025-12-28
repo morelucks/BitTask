@@ -50,3 +50,24 @@ describe('BitToken Contract', () => {
     
     expect(transfer.result).toBeErr(Cl.uint(3)); // ERR-UNAUTHORIZED
   });
+  it('should approve and check allowances', () => {
+    const approveAmount = 5000;
+    
+    const approve = simnet.callPublicFn(
+      'token', 
+      'approve', 
+      [Cl.principal(alice), Cl.uint(approveAmount)], 
+      deployer
+    );
+    
+    expect(approve.result).toBeOk(Cl.bool(true));
+    
+    const allowance = simnet.callReadOnlyFn(
+      'token', 
+      'get-allowance', 
+      [Cl.principal(deployer), Cl.principal(alice)], 
+      deployer
+    );
+    
+    expect(allowance.result).toBeOk(Cl.uint(approveAmount));
+  });
