@@ -71,6 +71,7 @@
           (token-ids-length (len token-ids)))
         ;; Ensure arrays have same length
         (asserts! (is-eq owners-length token-ids-length) ERR-ARRAY-LENGTH-MISMATCH)
+        (try! (validate-batch-size owners-length))
         
         ;; Map over the pairs and get balances
         (ok (map get-balance-pair (zip owners token-ids)))
