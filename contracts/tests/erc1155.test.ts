@@ -861,6 +861,16 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(balance.result).toBeOk(Cl.uint(largeAmount));
     });
 
+    it("should validate token existence", () => {
+      const exists = simnet.callReadOnlyFn(
+        "erc1155",
+        "token-exists",
+        [Cl.uint(999)],
+        deployer
+      );
+      expect(exists.result).toBeOk(Cl.bool(false));
+    });
+
     it("should handle multiple token types for same user", () => {
       // Mint different token types
       simnet.callPublicFn(
