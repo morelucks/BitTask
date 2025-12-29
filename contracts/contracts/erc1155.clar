@@ -13,6 +13,7 @@
 (define-constant ERR-INVALID-PRINCIPAL (err u107))
 ;; Maximum batch size for operations
 (define-constant MAX-BATCH-SIZE u50)
+(define-constant ERR-CONTRACT-PAUSED (err u108))
 
 ;; Contract owner
 (define-data-var contract-owner principal tx-sender)
