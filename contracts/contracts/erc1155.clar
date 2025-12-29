@@ -509,11 +509,16 @@
 
 ;; Utility Functions
 
-;; @desc Check if a token has any circulating supply
+;; @desc Check if token has supply
 ;; @param token-id: The token ID to check
 ;; @returns: True if token has supply > 0
 (define-read-only (has-supply (token-id uint))
     (> (get-total-supply token-id) u0)
+)
+
+;; @desc Check if token is active (exists and has supply)
+(define-read-only (is-token-active (token-id uint))
+    (and (token-exists token-id) (has-supply token-id))
 )
 
 ;; @desc Get multiple token supplies in one call
