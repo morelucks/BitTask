@@ -891,6 +891,16 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(balance.result).toBeOk(Cl.uint(0));
     });
 
+    it("should validate URI queries", () => {
+      const uri = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-token-uri",
+        [Cl.uint(999)],
+        deployer
+      );
+      expect(uri.result).toBeOk(Cl.stringAscii(""));
+    });
+
     it("should handle multiple token types for same user", () => {
       // Mint different token types
       simnet.callPublicFn(
