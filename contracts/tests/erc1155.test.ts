@@ -921,6 +921,16 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(owner.result).toBeOk(Cl.principal(deployer));
     });
 
+    it("should check next token ID", () => {
+      const nextId = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-next-token-id",
+        [],
+        deployer
+      );
+      expect(nextId.result).toBeOk(Cl.uint(1));
+    });
+
     it("should handle multiple token types for same user", () => {
       // Mint different token types
       simnet.callPublicFn(
