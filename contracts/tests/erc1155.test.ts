@@ -911,6 +911,16 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(approved.result).toBeOk(Cl.bool(false));
     });
 
+    it("should validate contract owner", () => {
+      const owner = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-contract-owner",
+        [],
+        deployer
+      );
+      expect(owner.result).toBeOk(Cl.principal(deployer));
+    });
+
     it("should handle multiple token types for same user", () => {
       // Mint different token types
       simnet.callPublicFn(
