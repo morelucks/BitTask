@@ -11,6 +11,7 @@
 (define-constant ERR-ARRAY-LENGTH-MISMATCH (err u105))
 (define-constant ERR-TOKEN-NOT-FOUND (err u106))
 (define-constant ERR-INVALID-PRINCIPAL (err u107))
+(define-constant ERR-CONTRACT-PAUSED (err u108))
 
 ;; Contract owner
 (define-data-var contract-owner principal tx-sender)
