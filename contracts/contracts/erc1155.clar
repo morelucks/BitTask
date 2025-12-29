@@ -108,10 +108,10 @@
     (var-get contract-owner)
 )
 
-;; @desc Get the next token ID that will be assigned
-;; @returns: The next available token ID
-(define-read-only (get-next-token-id)
-    (var-get next-token-id)
+;; @desc Get total tokens created
+;; @returns: Total number of token types created
+(define-read-only (get-total-tokens-created)
+    (var-get total-tokens-created)
 )
 
 ;; @desc Get token URI for metadata
