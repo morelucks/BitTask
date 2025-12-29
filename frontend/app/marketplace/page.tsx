@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Task, fetchTasks } from '../../lib/contracts';
 import { TaskCard } from '../../components/TaskCard';
+import { isTaskExpired } from '../../lib/taskUtils';
 import { Loader2, Search, X } from 'lucide-react';
 
 type StatusFilter = 'all' | 'open' | 'in-progress' | 'submitted' | 'completed';

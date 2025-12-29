@@ -201,3 +201,35 @@ export async function rejectWork(
     throw error;
   }
 }
+
+export async function reclaimExpired(
+  userSession: UserSession,
+  taskId: number,
+  options?: ContractCallOptions
+): Promise<void> {
+  try {
+    await openContractCall({
+      contractAddress: CONTRACT_ADDRESS,
+      contractName: CONTRACT_NAME,
+      functionName: 'reclaim-expired',
+      functionArgs: [uintCV(taskId)],
+      network,
+      userSession,
+      onFinish: (data) => {
+        console.log('Funds reclaimed:', data);
+        const txId = data?.txId || data?.txid || data?.response?.txid || data?.stacksTransaction?.txid();
+        if (txId && options?.onTransactionId) {
+          options.onTransactionId(txId);
+        }
+        options?.onFinish?.(data);
+      },
+      onCancel: () => {
+        console.log('Transaction cancelled');
+        options?.onCancel?.();
+      },
+    });
+  } catch (error) {
+    console.error('Error reclaiming expired task:', error);
+    throw error;
+  }
+}

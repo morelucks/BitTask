@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Task, fetchTasks } from '../../../lib/contracts';
-import { acceptTask, submitWork, approveWork, rejectWork } from '../../../lib/contractActions';
+import { acceptTask, submitWork, approveWork, rejectWork, reclaimExpired } from '../../../lib/contractActions';
 import { useAuth } from '../../../components/Providers';
 import { useStacksWallet } from '../../../lib/stacks-wallet';
 import { useTransactionTracker } from '../../../lib/transactionTracker';
+import { isTaskExpired, getCurrentBlockHeight } from '../../../lib/taskUtils';
 import { showNotification } from '../../../lib/notifications';
 import { ArrowLeft, Loader2, Clock, User, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -26,6 +27,8 @@ export default function TaskDetailPage() {
     const [isActionLoading, setIsActionLoading] = useState(false);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
     const [submissionText, setSubmissionText] = useState('');
+    const [isExpired, setIsExpired] = useState(false);
+    const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
 
     useEffect(() => {
         if (isNaN(taskId)) {
@@ -52,7 +55,14 @@ export default function TaskDetailPage() {
         }
 
         loadTask();
+        getCurrentBlockHeight().then(setCurrentBlockHeight);
     }, [taskId]);
+
+    useEffect(() => {
+        if (task) {
+            isTaskExpired(task).then(setIsExpired);
+        }
+    }, [task, currentBlockHeight]);
 
     const reloadTask = async () => {
         try {
@@ -189,10 +199,48 @@ export default function TaskDetailPage() {
         }
     };
 
+    const handleReclaimExpired = async () => {
+        if (!confirm('Are you sure you want to reclaim funds from this expired task?')) {
+            return;
+        }
+
+        setIsActionLoading(true);
+        try {
+            await reclaimExpired(userSession, taskId, {
+                onTransactionId: (txId) => {
+                    addTransaction({
+                        txId,
+                        status: 'pending',
+                        timestamp: Date.now(),
+                        type: 'reject-work', // Using reject-work type for now
+                        taskId,
+                    });
+                },
+                onFinish: async (data) => {
+                    showNotification.success('Funds reclaimed!', 'Your STX has been refunded');
+                    await reloadTask();
+                    setIsActionLoading(false);
+                },
+                onCancel: () => {
+                    setIsActionLoading(false);
+                },
+            });
+        } catch (error) {
+            console.error('Failed to reclaim expired task', error);
+            showNotification.error('Failed to reclaim funds', 'Please try again');
+            setIsActionLoading(false);
+        }
+    };
+
     const safeDate = (timestamp: number) => {
         if (!timestamp || isNaN(timestamp)) return 'No Deadline';
         try {
-            return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+            // Convert block height to approximate date
+            // Stacks blocks are ~10 minutes apart, so we estimate
+            const blocksFromNow = timestamp - currentBlockHeight;
+            const minutesFromNow = blocksFromNow * 10;
+            const estimatedDate = new Date(Date.now() + minutesFromNow * 60 * 1000);
+            return estimatedDate.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
@@ -227,7 +275,7 @@ export default function TaskDetailPage() {
         );
     }
 
-    const isExpired = Date.now() > task.deadline * 1000;
+    // isExpired is calculated from block height in useEffect
     const statusColor = {
         'open': 'bg-green-500/10 text-green-400',
         'in-progress': 'bg-yellow-500/10 text-yellow-400',
