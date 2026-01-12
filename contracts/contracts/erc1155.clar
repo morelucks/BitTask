@@ -40,6 +40,9 @@
 ;; Operator approvals: (owner, operator) -> approved
 (define-map operator-approvals {owner: principal, operator: principal} bool)
 
+;; Token creator tracking: token-id -> creator
+(define-map token-creators uint principal)
+
 ;; Token metadata URIs: token-id -> uri
 (define-map token-uris uint (string-ascii 256))
 
