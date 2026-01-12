@@ -441,7 +441,7 @@
     (not (is-eq addr 'SP000000000000000000002Q6VF78))
 )
 
-;; @desc Enhanced transfer validation with comprehensive checks
+;; @desc Enhanced transfer validation with comprehensive checks and gas optimization
 ;; @param from: Sender address
 ;; @param to: Recipient address  
 ;; @param token-id: Token ID
@@ -449,11 +449,12 @@
 ;; @returns: Success if all validations pass
 (define-private (validate-transfer (from principal) (to principal) (token-id uint) (amount uint))
     (begin
-        ;; Basic validations
+        ;; Basic validations with early returns for gas efficiency
         (asserts! (> amount u0) ERR-ZERO-AMOUNT)
         (asserts! (not (is-eq from to)) ERR-SELF-TRANSFER)
         (asserts! (is-valid-principal from) ERR-INVALID-PRINCIPAL)
         (asserts! (is-valid-principal to) ERR-INVALID-PRINCIPAL)
+        (asserts! (token-exists token-id) ERR-TOKEN-NOT-FOUND)
         (asserts! (>= (get-balance from token-id) amount) ERR-INSUFFICIENT-BALANCE)
         (ok true)
     )
