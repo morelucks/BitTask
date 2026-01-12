@@ -884,10 +884,16 @@
                 (begin
                     (var-set next-token-id (+ actual-token-id u1))
                     (map-set token-exists-map actual-token-id true)
+                    ;; Track token creator
+                    (map-set token-creators actual-token-id tx-sender)
                 )
                 ;; For existing token, verify it exists or create it
                 (if (not (token-exists actual-token-id))
-                    (map-set token-exists-map actual-token-id true)
+                    (begin
+                        (map-set token-exists-map actual-token-id true)
+                        ;; Track token creator for new tokens
+                        (map-set token-creators actual-token-id tx-sender)
+                    )
                     true
                 )
             )
