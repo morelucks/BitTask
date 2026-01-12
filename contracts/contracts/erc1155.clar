@@ -149,6 +149,13 @@
     (default-to "" (map-get? token-uris token-id))
 )
 
+;; @desc Get token creator
+;; @param token-id: The token ID to query
+;; @returns: The principal that created the token (none if not found)
+(define-read-only (get-token-creator (token-id uint))
+    (map-get? token-creators token-id)
+)
+
 ;; @desc Check if an operator is approved for all tokens of an owner
 ;; @param owner: The token owner
 ;; @param operator: The potential operator
