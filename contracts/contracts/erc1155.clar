@@ -1473,13 +1473,16 @@
     (list u1 u2 u3 u4 u5 u6 u7 u8 u9 u10) ;; Limited example
 )
 
-;; @desc Get contract statistics
-;; @returns: Tuple with contract statistics
+;; @desc Get contract statistics with enhanced metrics
+;; @returns: Tuple with comprehensive contract statistics
 (define-read-only (get-contract-stats)
     {
         owner: (var-get contract-owner),
         next-token-id: (var-get next-token-id),
-        total-token-types: (- (var-get next-token-id) u1)
+        total-token-types: (- (var-get next-token-id) u1),
+        paused: (var-get contract-paused),
+        deployment-height: (var-get deployment-time),
+        current-height: stacks-block-height
     }
 )
 ;; Comprehensive Input Validation
