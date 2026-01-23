@@ -2,26 +2,28 @@
 ;; Contract for managing tasks, escrow, and payments.
 
 ;; Constants
-(define-constant ERR-ZERO-AMOUNT (err u100))
-(define-constant ERR-INVALID-ID (err u101))
-(define-constant ERR-UNAUTHORIZED (err u102))
-(define-constant ERR-PAST-DEADLINE (err u103))
-(define-constant ERR-EMPTY-TITLE (err u104))
-(define-constant ERR-EMPTY-DESCRIPTION (err u105))
-(define-constant ERR-CREATOR-CANNOT-ACCEPT (err u106))
-(define-constant ERR-NOT-OPEN (err u107))
-(define-constant ERR-NOT-IN-PROGRESS (err u108))
-(define-constant ERR-NOT-WORKER (err u109))
-(define-constant ERR-NOT-SUBMITTED (err u110))
-(define-constant ERR-NOT-CREATOR (err u111))
-(define-constant ERR-ALREADY-COMPLETED (err u112))
+;; Error Constants
+(define-constant ERR-ZERO-AMOUNT (err u100)) ;; Amount must be greater than 0
+(define-constant ERR-INVALID-ID (err u101)) ;; Task ID not found
+(define-constant ERR-UNAUTHORIZED (err u102)) ;; Caller is not authorized
+(define-constant ERR-PAST-DEADLINE (err u103)) ;; Deadline has passed
+(define-constant ERR-EMPTY-TITLE (err u104)) ;; Title cannot be empty
+(define-constant ERR-EMPTY-DESCRIPTION (err u105)) ;; Description cannot be empty
+(define-constant ERR-CREATOR-CANNOT-ACCEPT (err u106)) ;; Creator cannot accept their own task
+(define-constant ERR-NOT-OPEN (err u107)) ;; Task status is not 'open'
+(define-constant ERR-NOT-IN-PROGRESS (err u108)) ;; Task status is not 'in-progress'
+(define-constant ERR-NOT-WORKER (err u109)) ;; Caller is not the assigned worker
+(define-constant ERR-NOT-SUBMITTED (err u110)) ;; Task has not been submitted
+(define-constant ERR-NOT-CREATOR (err u111)) ;; Caller is not the task creator
+(define-constant ERR-ALREADY-COMPLETED (err u112)) ;; Task is already completed
 
-;; Data Vars
-(define-data-var task-nonce uint u0)
+;; Data Variables
+(define-data-var task-nonce uint u0) ;; Global counter for task IDs
 
 ;; Data Maps
+;; Main storage for task details
 (define-map Tasks
-    uint
+    uint ;; Task ID
     {
         title: (string-ascii 50),
         description: (string-ascii 256),
