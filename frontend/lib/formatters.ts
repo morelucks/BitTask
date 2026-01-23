@@ -24,5 +24,21 @@ export function timeAgo(timestamp: number): string {
     if (interval > 1) return Math.floor(interval) + " hours ago";
     interval = seconds / 60;
     if (interval > 1) return Math.floor(interval) + " minutes ago";
+
     return Math.floor(seconds) + " seconds ago";
+}
+
+export function formatSTX(amount: number): string {
+    return new Intl.NumberFormat('en-US', {
+        style: 'decimal',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 6,
+    }).format(amount) + " STX";
+}
+
+export function formatUSD(amount: number): string {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+    }).format(amount);
 }
