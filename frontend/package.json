@@ -30,6 +30,7 @@
     "wagmi": "^2.9.2"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
     "@tailwindcss/postcss": "^4",
     "@types/dotenv": "^6.1.1",
     "@types/node": "^20",
