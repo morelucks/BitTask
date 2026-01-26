@@ -57,12 +57,55 @@ describe('reject-work', () => {
             deployer
         );
 
-        expect(task.result).toBeSome(expect.objectContaining({
-            status: Cl.stringAscii("open"),
-            worker: Cl.none(),
-            submission: Cl.none()
-        }));
+        expect(task.result).toBeSome(
+            expect.objectContaining({
+                status: Cl.stringAscii("open"),
+                worker: Cl.none(),
+                submission: Cl.none()
+            })
+        );
+    });
+
+    it('should fail if caller is not the task creator', () => {
+        const deadline = simnet.blockHeight + 50;
+
+        // Create task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task to Reject"),
+                Cl.stringAscii("Description"),
+                Cl.uint(1000),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Accept task
+        simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            wallet2
+        );
+
+        // Submit work
+        simnet.callPublicFn(
+            'bittask',
+            'submit-work',
+            [Cl.uint(1), Cl.stringAscii("link")],
+            wallet2
+        );
+
+        // Try reject from worker wallet
+        const { result } = simnet.callPublicFn(
+            'bittask',
+            'reject-work',
+            [Cl.uint(1)],
+            wallet2
+        );
+
+        expect(result).toBeErr(Cl.uint(111)); // ERR-NOT-CREATOR
     });
 });
-
-
